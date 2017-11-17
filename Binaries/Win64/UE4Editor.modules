@@ -2,7 +2,7 @@
 	"BuildId": "3709383",
 	"Modules": 
 	{
-		"Dolphin": "UE4Editor-Dolphin.dll",
-		"DolphinEditor": "UE4Editor-DolphinEditor.dll"
+		"Dolphin": "UE4Editor-Dolphin-769.dll",
+		"DolphinEditor": "UE4Editor-DolphinEditor-769.dll"
 	}
 }
