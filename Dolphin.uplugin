@@ -1,0 +1,41 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0",
+  "FriendlyName": "Dolphin",
+  "Description": "",
+  "Category": "Other",
+  "CreatedBy": "Alan",
+  "CreatedByURL": "",
+  "DocsURL": "",
+  "MarketplaceURL": "",
+  "SupportURL": "",
+  "CanContainContent": true,
+  "IsBetaVersion": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "Dolphin",
+      "Type": "Runtime",
+      "LoadingPhase": "PreLoadingScreen"
+    },
+	{
+		  "Name": "DolphinEditor",
+		  "Type": "Editor"
+		}
+  ],
+  "Plugins": [
+    {
+      "Name": "PahoMQTT",
+      "Enabled": true
+    },
+    {
+      "Name": "ProtoBuf",
+      "Enabled": true
+    },
+    {
+      "Name": "SchweizerMesser",
+      "Enabled": true
+    }
+  ]
+}
