@@ -2,49 +2,64 @@
 
 #include "DolphinListener.h"
 #include "DolphinBPLibrary.h"
+#include "Dolphin/Crypto/AES.h"
 
-#include "Crypto/AES.h"
+
+DEFINE_LOG_CATEGORY(LogDolphinListener);
 
 void DolphinListener::ConnectFailure(const mqtt::token & tok)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Connect connect_failure"));
+	UDolphinBPLibrary::OnConnectFailure();
+	UE_LOG(LogDolphinListener, Warning, TEXT("OnConnectFailure"));
 
-	UE_LOG(LogTemp, Warning, TEXT("Reconnect"));
+	FPlatformProcess::Sleep(5.0f);
+
 	Dolphin::DolphinManager::GetInstance()->Reconnect();
 }
 
 void DolphinListener::ConnectSuccess(const mqtt::token & tok)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Connect connect_success"));
 }
 
 void DolphinListener::SubscribeFailure(const mqtt::token & tok)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Connect subscribe_failure"));
+	UE_LOG(LogDolphinListener, Warning, TEXT("SubscribeFailure"));
 }
 
 void DolphinListener::SubscribeSuccess(const mqtt::token & tok)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Connect subscribe_success"));
+	UE_LOG(LogDolphinListener, Warning, TEXT("SubscribeSuccess"));
+	for (int i = 0; i < tok.get_topics()->size(); ++i) {
+		if (strcmp(tok.get_topics()->c_arr()[i], "f")) {
+			UDolphinBPLibrary::OnConnectionReady();
+		}
+	}
 }
 
 void DolphinListener::OnConnected(const std::string & cause)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Connect Successful"));
+	UE_LOG(LogDolphinListener, Warning, TEXT("OnConnectSuccess"));
+
+	//UDolphinBPLibrary::OnConnectSuccess();
 	Dolphin::DolphinManager::GetInstance()->Subscribe("s");
 }
 
 void DolphinListener::ConnectionLost(const std::string & cause)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Disconnect Successful"));
+	UE_LOG(LogDolphinListener, Warning, TEXT("OnConnectionLost"));
+	UDolphinBPLibrary::OnConnectionLost();
+
+	Dolphin::DolphinManager::GetInstance()->Reconnect();
 }
 
 void DolphinListener::MessageReceived(mqtt::const_message_ptr msg)
 {
+	UE_LOG(LogDolphinListener, Warning, TEXT("MessageReceived"));
+
 	mqtt::binary_ref payload = msg->get_payload_ref();
 	const char * topic = msg->get_topic_ref().c_str();
 	size_t payloadSize = msg->get_payload_ref().length();
-
+	
 	if (strcmp(topic, "s") == 0)
 	{
 		const char * clientid = TCHAR_TO_ANSI(*UDolphinBPLibrary::ClientID);
@@ -71,16 +86,12 @@ void DolphinListener::MessageReceived(mqtt::const_message_ptr msg)
 		//memcpy(UDolphinBPLibrary::XKey + 16, UDolphinBPLibrary::XKey, 16);
 
 		free(content);
-
 		Dolphin::DolphinManager::GetInstance()->Unsubscribe("s");
 		Dolphin::DolphinManager::GetInstance()->Subscribe("f");
+		UDolphinBPLibrary::OnConnectSuccess();
 	}
 	else if (strcmp(topic, "f") == 0)
 	{
-		duration<double, std::milli> time_span = high_resolution_clock::now() - UDolphinBPLibrary::t1;
-		UE_LOG(LogTemp, Warning, TEXT("UserLoginResponse_Received_Elapse %f milliseconds"), time_span.count());
-		UDolphinBPLibrary::t1 = high_resolution_clock::now();
-
 		OriginalMessage * message = new OriginalMessage(payloadSize - 2);
 
 		uint8* buffer = (uint8*)malloc(payloadSize);
@@ -89,15 +100,12 @@ void DolphinListener::MessageReceived(mqtt::const_message_ptr msg)
 		aes_key_setup(UDolphinBPLibrary::XKey, key_schedule, 128);
 		aes_decrypt_ctr((const uint8 *)payload.data(), payloadSize, (uint8 *)buffer, key_schedule, 128, UDolphinBPLibrary::XKey);
 
+		message->MsgId = msg->get_msgid();
 		message->ProtocolModule = buffer[0];
 		message->SpecificProtocol = buffer[1];
 		memcpy(message->Buffer, buffer + 2, message->BufferSize);
 
 		free(buffer);
-
-		time_span = high_resolution_clock::now() - UDolphinBPLibrary::t1;
-		UE_LOG(LogTemp, Warning, TEXT("UserLoginResponse_Decrypt_Elapse %f milliseconds"), time_span.count());
-		UDolphinBPLibrary::t1 = high_resolution_clock::now();
 
 		FString ProtocolModuleStr("EProtocolModule");
 		UEnum* ProtocolModuleEnum = FindObject<UEnum>(ANY_PACKAGE, *ProtocolModuleStr);
@@ -107,23 +115,26 @@ void DolphinListener::MessageReceived(mqtt::const_message_ptr msg)
 		SpecificProtocolStr.Append(ProtocolModuleName);
 		SpecificProtocolStr.Append("Protocol");
 		UEnum* SpecificProtocolEnum = FindObject<UEnum>(ANY_PACKAGE, *SpecificProtocolStr);
-		FString SpecificProtocolName = SpecificProtocolEnum->GetNameStringByValue(message->SpecificProtocol);
+		if (SpecificProtocolEnum != nullptr) {
+			FString SpecificProtocolName = SpecificProtocolEnum->GetNameStringByValue(message->SpecificProtocol);
 
-		FString DolphinResponseStr(ProtocolModuleName);
-		DolphinResponseStr.Append("_");
-		DolphinResponseStr.Append(SpecificProtocolName);
-		DolphinResponseStr.Append("_");
-		DolphinResponseStr.Append("Response");
-		message->ResponseClass = DolphinResponseStr;
-		UDolphinBPLibrary::Enqueue(message);
-		time_span = high_resolution_clock::now() - UDolphinBPLibrary::t1;
-		UE_LOG(LogTemp, Warning, TEXT("UserLoginResponse_Reflection_Elapse %f milliseconds"), time_span.count());
-		UDolphinBPLibrary::t1 = high_resolution_clock::now();
+			FString DolphinResponseStr(ProtocolModuleName);
+			DolphinResponseStr.Append("_");
+			DolphinResponseStr.Append(SpecificProtocolName);
+			DolphinResponseStr.Append("_");
+			DolphinResponseStr.Append("Response");
+			message->ResponseClass = DolphinResponseStr;
+			UDolphinBPLibrary::Enqueue(message);
+		}
+		else
+		{
+			UE_LOG(LogDolphinListener, Warning, TEXT("ProtocalModule not found"));
+		}
+
 	}
 }
 
 void DolphinListener::MessageDelivered(mqtt::delivery_token_ptr token)
 {
-	duration<double, std::milli> time_span = high_resolution_clock::now() - UDolphinBPLibrary::t1;
-	UE_LOG(LogTemp, Warning, TEXT("UserLoginRequest_Delivered_Elapse %f milliseconds"), time_span.count());
+	UE_LOG(LogDolphinListener, Log, TEXT("MessageDelivered"));
 }

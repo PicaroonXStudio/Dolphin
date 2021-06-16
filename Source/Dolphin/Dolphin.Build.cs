@@ -1,29 +1,28 @@
 // Some copyright should be here...
 
 using UnrealBuildTool;
+using System.IO;
 
 public class Dolphin : ModuleRules
 {
 	public Dolphin(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		
-		PublicIncludePaths.AddRange(
-			new string[] {
-				"Dolphin/Public",
-                "Dolphin/Bridge",
-				// ... add public include paths required here ...
-			}
+
+        //bEnableExceptions = true;
+
+        PublicIncludePaths.AddRange(
+            new string[] {
+                Path.Combine(ModuleDirectory, "Public"),
+                Path.Combine(ModuleDirectory, "Bridge"),
+            }
             );
-				
-		
-		PrivateIncludePaths.AddRange(
-			new string[] {
-				"Dolphin/Private",
-				// ... add other private include paths required here ...
-			}
+
+        PrivateIncludePaths.AddRange(
+            new string[] {
+                Path.Combine(ModuleDirectory, "Private"),
+            }
             );
-			
 		
 		PublicDependencyModuleNames.AddRange(
 			new string[]

@@ -1,12 +1,12 @@
 #include "DolphinProtocol.h"
 #include "DolphinBPLibrary.h"
-#include "Bridge/DolphinManager.h"
+#include "Dolphin/Crypto/AES.h"
 
-#include "AES.h"
+DEFINE_LOG_CATEGORY(LogDolphinProtocol);
 
 void  UDolphinRequest::Pack()
 {
-	UDolphinBPLibrary::t1 = high_resolution_clock::now();
+	UE_LOG(LogDolphinProtocol, Warning, TEXT("UDolphinRequest::Pack"));
 
 	mSize = mMessage->ByteSize() + 2;
 	mData = std::shared_ptr<char>(new char[mSize], std::default_delete<char[]>());
@@ -20,32 +20,26 @@ void  UDolphinRequest::Pack()
 
 	mMessage->SerializeToArray(data + 2, mSize);
 
-	duration<double, std::milli> time_span = high_resolution_clock::now() - UDolphinBPLibrary::t1;
-
-	UE_LOG(LogTemp, Warning, TEXT("UserLoginRequest_Pack_Elapse %f milliseconds"), time_span.count());
-
-	UDolphinBPLibrary::t1 = high_resolution_clock::now();
-
 	uint32 key_schedule[60];
 	aes_key_setup(UDolphinBPLibrary::XKey, key_schedule, 128);
 	aes_encrypt_ctr((const uint8 *)data, mSize, (uint8 *)data, key_schedule, 128, UDolphinBPLibrary::XKey);
-
-	time_span = high_resolution_clock::now() - UDolphinBPLibrary::t1;
-	UE_LOG(LogTemp, Warning, TEXT("UserLoginRequest_Encrypt_Elapse %f milliseconds"), time_span.count());
 }
 
 void UDolphinRequest::Send()
 {
 	Pack();
+	int msgId = Dolphin::DolphinManager::GetInstance()->Send("f", mData.get(), mSize);
 
-	UDolphinBPLibrary::t1 = high_resolution_clock::now();
-	Dolphin::DolphinManager::GetInstance()->Send("f", mData.get(), mSize);
+	if (OnResponse.IsBound())
+	{
+		UDolphinBPLibrary::SpecificResponseDelegates.Add(msgId, OnResponse);
+	}
 }
 
 void UDolphinResponse::Dispatch(OriginalMessage *message)
 {
 	Unpack(message);
-	UDolphinBPLibrary::Dispatch(protocolNo, this);
+	UDolphinBPLibrary::Dispatch(protocolNo, this, message->MsgId);
 }
 
 void UDolphinResponse::Unpack(OriginalMessage *message)

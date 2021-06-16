@@ -3,9 +3,8 @@
 #include "DolphinEditorStyle.h"
 #include "DolphinEditor.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Interfaces/IPluginManager.h"
 #include "Styling/SlateStyleRegistry.h"
-#include "SlateGameResources.h"
-#include "IPluginManager.h"
 
 TSharedPtr< FSlateStyleSet > FDolphinEditorStyle::StyleInstance = NULL;
 

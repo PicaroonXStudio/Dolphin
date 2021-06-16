@@ -1,8 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "EnumComboCustomization.h"
-#include "MultiBoxBuilder.h"
-#include "SComboButton.h"
 
 
 TSharedRef<SWidget> FEnumComboCustomization::OnEnumValueContent(TSharedRef<IPropertyHandle> PropertyHandle, UEnum *EnumType, FExecuteAction EnumValueComboChangeDelegate) const

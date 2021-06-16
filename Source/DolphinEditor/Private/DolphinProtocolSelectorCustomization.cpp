@@ -1,15 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "DolphinProtocolSelectorCustomization.h"
-#include "SharedPointer.h"
-#include "STextBlock.h"
 #include "DetailLayoutBuilder.h"
-#include "Platform.h"
 #include "Engine.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "PropertyCustomizationHelpers.h"
-#include "STextComboBox.h"
 #include "DolphinResponseCallbackStructs.h"
 
 #define LOCTEXT_NAMESPACE "MyStructCustomization"

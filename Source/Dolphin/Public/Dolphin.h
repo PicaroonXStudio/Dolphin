@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "ModuleManager.h"
 
 class FDolphinModule : public IModuleInterface
 {

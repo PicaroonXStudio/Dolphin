@@ -2,7 +2,10 @@
 
 #pragma once
 
-#include "Bridge/IDophinListener.h"
+#include "Engine.h"
+#include "IDophinListener.h"
+
+DECLARE_LOG_CATEGORY_EXTERN(LogDolphinListener, Log, All);
 
 class DolphinListener : public Dolphin::IDophinListener
 {

@@ -5,14 +5,21 @@
 
 DolphinListener UDolphinBPLibrary::mDolphinListener;
 TMap<uint16, FDolphinResponseDelegate> UDolphinBPLibrary::mDolphinResponseDelegates;
+TMap<int32, FDolphinResponseDelegate> UDolphinBPLibrary::SpecificResponseDelegates;
+
 TQueue<OriginalMessage *, EQueueMode::Spsc> UDolphinBPLibrary::mOriginalMessageQueue;
+EConnectStatus UDolphinBPLibrary::CurrentConnectStatus;
+EConnectStatus  UDolphinBPLibrary::ConnectStatus;
+
+FDolphinConnectDelegate UDolphinBPLibrary::ConnectStatusCallback;
+
 char * UDolphinBPLibrary::mData = nullptr;
 
 FString UDolphinBPLibrary::ClientID;
 
 uint8 UDolphinBPLibrary::XKey[];
 
-std::chrono::high_resolution_clock::time_point UDolphinBPLibrary::t1;
+DEFINE_LOG_CATEGORY(LogDolphinBPLibrary);
 
 void UDolphinBPLibrary::Connect(const FString &IP, const FString &_ClientID)
 {
@@ -29,6 +36,7 @@ void UDolphinBPLibrary::Disconnect()
 {
 	Dolphin::DolphinManager::GetInstance()->Disconnect();
 	Dolphin::DolphinManager::GetInstance()->RemoveDolphinListener(&mDolphinListener);
+	CurrentConnectStatus = EConnectStatus::disconnect;
 }
 
 void UDolphinBPLibrary::RegisterResponseCallback(uint8 ProtocolModule, uint8 SpecificProtocol, UObject * object, const FName& FunctionName)
@@ -64,14 +72,57 @@ void UDolphinBPLibrary::UnregisterResponseCallback(uint8 ProtocolModule, uint8 S
 	}
 }
 
+void UDolphinBPLibrary::RegisterOnConnectStatusCallback(const FDolphinConnectDelegate& Callback)
+{
+	ConnectStatusCallback = Callback;
+	ConnectStatusCallback.ExecuteIfBound(CurrentConnectStatus);
+}
+
+EConnectStatus UDolphinBPLibrary::getConnectStatus()
+{
+	return CurrentConnectStatus;
+}
+
+void UDolphinBPLibrary::OnConnectSuccess()
+{
+
+	CurrentConnectStatus = EConnectStatus::success;
+}
+
+void UDolphinBPLibrary::OnConnectFailure()
+{
+	CurrentConnectStatus = EConnectStatus::failure;
+}
+
+void UDolphinBPLibrary::OnConnectionReady()
+{
+	CurrentConnectStatus = EConnectStatus::ready;
+}
+
+void UDolphinBPLibrary::OnConnectionLost()
+{
+	CurrentConnectStatus = EConnectStatus::lost;
+}
+
 void UDolphinBPLibrary::Tick()
 {
+	if (CurrentConnectStatus != ConnectStatus) {
+		ConnectStatus = CurrentConnectStatus;
+		ConnectStatusCallback.ExecuteIfBound(ConnectStatus);
+	}
+
 	Dequeue();
 }
 
-void UDolphinBPLibrary::Dispatch(int protocolNo, UDolphinResponse *DolphinResponse)
+void UDolphinBPLibrary::Dispatch(int protocolNo, UDolphinResponse *DolphinResponse, int msgid)
 {
-	if (mDolphinResponseDelegates.Contains(protocolNo))
+	if (SpecificResponseDelegates.Contains(msgid))
+	{
+		UE_LOG(LogDolphinBPLibrary, Warning, TEXT("Response Message ID %d"), msgid);
+		SpecificResponseDelegates[msgid].Broadcast(DolphinResponse);
+		SpecificResponseDelegates.Remove(msgid);
+	}
+	else if (mDolphinResponseDelegates.Contains(protocolNo))
 	{
 		mDolphinResponseDelegates[protocolNo].Broadcast(DolphinResponse);
 	}
@@ -88,10 +139,12 @@ void UDolphinBPLibrary::Dequeue()
 	if (mOriginalMessageQueue.Dequeue(msg))
 	{
 		UClass* DolphinResponseClass = FindObject<UClass>(ANY_PACKAGE, *msg->ResponseClass);
-		UDolphinResponse *DolphinResponse = NewObject<UDolphinResponse>(GetTransientPackage(), DolphinResponseClass);
-		DolphinResponse->Dispatch(msg);
+		if (DolphinResponseClass && DolphinResponseClass->IsChildOf(UDolphinResponse::StaticClass())) {
+			UDolphinResponse *DolphinResponse = NewObject<UDolphinResponse>(GetTransientPackage(), DolphinResponseClass);
+			if (DolphinResponse) {
+				DolphinResponse->Dispatch(msg);
+			}
+		}
 		delete msg;
-		duration<double, std::milli> time_span = high_resolution_clock::now() - UDolphinBPLibrary::t1;
-		UE_LOG(LogTemp, Warning, TEXT("UserLoginResponse_Dispatch_Elapse %f milliseconds"), time_span.count());
 	}
 }
